@@ -1,4 +1,5 @@
 // ex 01 solution on ; 0x0717a58d4c561dddaff3a8f4893deb3097c2b30fa6011bde9205cda55f507489
+// ex 02 solution on ; 0x06ee25c1adc7f14e0ec3a6d36901c136c540d51e029479e58d9ead3e853f6cf5
 
 use starknet::ContractAddress;
 
@@ -10,6 +11,11 @@ trait ISRC5<TContractState> {
 #[starknet::interface]
 trait IERC721Receiver<TContractState> {
     fn _on_erc721_received(self: @TContractState, operator: ContractAddress, from: ContractAddress, token_id: u256, data: Span<felt252>) -> felt252;
+}
+
+#[starknet::interface]
+trait IExerciceSolution<TContractState> {
+    fn get_animal_characteristics(self: @TContractState, token_id: u256) -> (felt252, felt252, felt252);
 }
 
 #[starknet::interface]
@@ -64,7 +70,15 @@ mod ERC721 {
         _token_approvals: LegacyMap<u256, ContractAddress>,
         _operator_approvals: LegacyMap<(ContractAddress, ContractAddress), bool>,
         _token_uri: LegacyMap<u256, felt252>,
+        _token_characteristics: LegacyMap<u256, Characteristics>
         //_contract_owner: ContractAddress
+    }
+
+    #[derive(Copy,Drop,Serde, storage_access::StorageAccess)]
+    struct Characteristics {
+        _legs: felt252,
+        _sex: felt252,
+        _wings: felt252,
     }
 
     #[event]
@@ -103,6 +117,14 @@ mod ERC721 {
     fn constructor(ref self: ContractState, name: felt252, symbol: felt252) {
         self._initialize(name, symbol);
         //self._contract_owner.write(get_caller_address());
+    }
+
+    #[external(v0)]
+    impl ExerciceSolution of super::IExerciceSolution<ContractState> {
+        fn get_animal_characteristics(self: @ContractState, token_id: u256) -> (felt252, felt252, felt252) {
+            assert(InternalFunctions::_exists(self,token_id), 'INVALID_TOKEN_ID');
+            (self._token_characteristics.read(token_id)._sex, self._token_characteristics.read(token_id)._legs, self._token_characteristics.read(token_id)._wings)
+        }
     }
 
     #[external(v0)]
@@ -268,6 +290,9 @@ mod ERC721 {
             self._balances.write(to, self._balances.read(to) + 1);
 
             self._owners.write(token_id, to);
+
+            //alloc stats
+            self._token_characteristics.write(token_id,Characteristics {_legs: 1,_sex: 2,_wings:3});
 
             self.emit(Event::Transfer(Transfer { from: Zeroable::zero(), to, token_id}));
         }
